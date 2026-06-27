@@ -1,7 +1,5 @@
-import crypto from 'crypto'
 import { NextFunction, Request, Response } from 'express'
 import { constants } from 'http2'
-import jwt, { JwtPayload } from 'jsonwebtoken'
 import { Error as MongooseError } from 'mongoose'
 import { REFRESH_TOKEN } from '../config'
 import BadRequestError from '../errors/bad-request-error'
@@ -9,6 +7,7 @@ import ConflictError from '../errors/conflict-error'
 import NotFoundError from '../errors/not-found-error'
 import UnauthorizedError from '../errors/unauthorized-error'
 import User from '../models/user'
+import { hashRefreshToken, verifyRefreshToken } from '../utils/tokens'
 
 // POST /auth/login
 const login = async (req: Request, res: Response, next: NextFunction) => {
@@ -84,33 +83,28 @@ const getCurrentUser = async (
     }
 }
 
-// Можно лучше: вынести общую логику получения данных из refresh токена
-const deleteRefreshTokenInUser = async (
-    req: Request,
-    _res: Response,
-    _next: NextFunction
-) => {
-    const { cookies } = req
-    const rfTkn = cookies[REFRESH_TOKEN.cookie.name]
+const getUserByRefreshToken = async (req: Request) => {
+    const refreshToken = req.cookies[REFRESH_TOKEN.cookie.name]
 
-    if (!rfTkn) {
+    if (!refreshToken) {
         throw new UnauthorizedError('Не валидный токен')
     }
 
-    const decodedRefreshTkn = jwt.verify(
-        rfTkn,
-        REFRESH_TOKEN.secret
-    ) as JwtPayload
+    const decodedRefreshToken = verifyRefreshToken(refreshToken)
     const user = await User.findOne({
-        _id: decodedRefreshTkn._id,
+        _id: decodedRefreshToken._id,
     }).orFail(() => new UnauthorizedError('Пользователь не найден в базе'))
 
-    const rTknHash = crypto
-        .createHmac('sha256', REFRESH_TOKEN.secret)
-        .update(rfTkn)
-        .digest('hex')
+    return { user, refreshToken }
+}
 
-    user.tokens = user.tokens.filter((tokenObj) => tokenObj.token !== rTknHash)
+const deleteRefreshTokenInUser = async (req: Request) => {
+    const { user, refreshToken } = await getUserByRefreshToken(req)
+    const refreshTokenHash = hashRefreshToken(refreshToken)
+
+    user.tokens = user.tokens.filter(
+        (tokenObj) => tokenObj.token !== refreshTokenHash
+    )
 
     await user.save()
 
@@ -121,7 +115,7 @@ const deleteRefreshTokenInUser = async (
 // GET  /auth/logout
 const logout = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        await deleteRefreshTokenInUser(req, res, next)
+        await deleteRefreshTokenInUser(req)
         const expireCookieOptions = {
             ...REFRESH_TOKEN.cookie.options,
             maxAge: -1,
@@ -142,11 +136,7 @@ const refreshAccessToken = async (
     next: NextFunction
 ) => {
     try {
-        const userWithRefreshTkn = await deleteRefreshTokenInUser(
-            req,
-            res,
-            next
-        )
+        const userWithRefreshTkn = await deleteRefreshTokenInUser(req)
         const accessToken = await userWithRefreshTkn.generateAccessToken()
         const refreshToken = await userWithRefreshTkn.generateRefreshToken()
         res.cookie(

@@ -1,35 +1,62 @@
 import { NextFunction, Request, Response } from 'express'
 import { constants } from 'http2'
 import { Error as MongooseError } from 'mongoose'
-import { join } from 'path'
 import BadRequestError from '../errors/bad-request-error'
 import ConflictError from '../errors/conflict-error'
 import NotFoundError from '../errors/not-found-error'
 import Product from '../models/product'
 import movingFile from '../utils/movingFile'
+import { getPublicPath } from '../utils/files'
+
+const MAX_LIMIT = 50
+
+function getQueryString(value: unknown) {
+    return typeof value === 'string' ? value : undefined
+}
+
+function parsePositiveInteger(
+    value: unknown,
+    defaultValue: number,
+    maxValue: number
+) {
+    const parsed = Number(getQueryString(value) ?? defaultValue)
+    if (!Number.isInteger(parsed) || parsed < 1) {
+        return defaultValue
+    }
+    return Math.min(parsed, maxValue)
+}
 
 // GET /product
 const getProducts = async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const { page = 1, limit = 5 } = req.query
+        const { page, limit } = req.query
+        const currentPage = parsePositiveInteger(
+            page,
+            1,
+            Number.MAX_SAFE_INTEGER
+        )
+        const pageSize = parsePositiveInteger(limit, 5, MAX_LIMIT)
+
         const options = {
-            skip: (Number(page) - 1) * Number(limit),
-            limit: Number(limit),
+            skip: (currentPage - 1) * pageSize,
+            limit: pageSize,
         }
+
         const products = await Product.find({}, null, options)
         const totalProducts = await Product.countDocuments({})
-        const totalPages = Math.ceil(totalProducts / Number(limit))
+        const totalPages = Math.ceil(totalProducts / pageSize)
+
         return res.send({
             items: products,
             pagination: {
                 totalProducts,
                 totalPages,
-                currentPage: Number(page),
-                pageSize: Number(limit),
+                currentPage,
+                pageSize,
             },
         })
-    } catch (err) {
-        return next(err)
+    } catch (error) {
+        return next(error)
     }
 }
 
@@ -44,10 +71,10 @@ const createProduct = async (
 
         // Переносим картинку из временной папки
         if (image) {
-            movingFile(
+            await movingFile(
                 image.fileName,
-                join(__dirname, `../public/${process.env.UPLOAD_PATH_TEMP}`),
-                join(__dirname, `../public/${process.env.UPLOAD_PATH}`)
+                getPublicPath(process.env.UPLOAD_PATH_TEMP || ''),
+                getPublicPath(process.env.UPLOAD_PATH || '')
             )
         }
 
@@ -72,7 +99,6 @@ const createProduct = async (
     }
 }
 
-// TODO: Добавить guard admin
 // PUT /product
 const updateProduct = async (
     req: Request,
@@ -85,22 +111,25 @@ const updateProduct = async (
 
         // Переносим картинку из временной папки
         if (image) {
-            movingFile(
+            await movingFile(
                 image.fileName,
-                join(__dirname, `../public/${process.env.UPLOAD_PATH_TEMP}`),
-                join(__dirname, `../public/${process.env.UPLOAD_PATH}`)
+                getPublicPath(process.env.UPLOAD_PATH_TEMP || ''),
+                getPublicPath(process.env.UPLOAD_PATH || '')
             )
+        }
+
+        const { description, category, price, title } = req.body
+        const updateData = {
+            description,
+            category,
+            title,
+            price: price || null,
+            image: image || undefined,
         }
 
         const product = await Product.findByIdAndUpdate(
             productId,
-            {
-                $set: {
-                    ...req.body,
-                    price: req.body.price ? req.body.price : null,
-                    image: req.body.image ? req.body.image : undefined,
-                },
-            },
+            { $set: updateData },
             { runValidators: true, new: true }
         ).orFail(() => new NotFoundError('Нет товара по заданному id'))
         return res.send(product)
@@ -120,7 +149,6 @@ const updateProduct = async (
     }
 }
 
-// TODO: Добавить guard admin
 // DELETE /product
 const deleteProduct = async (
     req: Request,

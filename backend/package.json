@@ -5,11 +5,19 @@
   "main": "dist/app.js",
   "scripts": {
     "lint": "npx eslint src/**/*.ts",
-    "format": "prettier ./src --write",
+    "format": "prettier \"src/**/*.ts\" \"scripts/**/*.mjs\" --write",
     "build": "tsc",
     "dev": "npx nodemon -L src/app.ts ",
     "start": "ts-node src/app.ts",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "lint:strict": "npx eslint src/**/*.ts --max-warnings=0",
+    "check:dangerous-code": "node scripts/check-dangerous-code.mjs",
+    "check:hardcode": "node scripts/check-hardcode.mjs",
+    "check": "npm run build && npm run lint:strict && npm run format:check && npm run check:unused && npm run check:empty-files && npm run check:deps && npm run check:dangerous-code && npm run check:hardcode",
+    "format:check": "prettier \"src/**/*.ts\" \"scripts/**/*.mjs\" --check",
+    "check:unused": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
+    "check:deps": "knip",
+    "check:empty-files": "node scripts/check-empty-files.mjs"
   },
   "author": "< Укажите здесь автора работы >",
   "license": "ISC",
@@ -29,7 +37,8 @@
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",
-    "prettier": "^3.3.3",
+    "knip": "^6.21.0",
+    "prettier": "^3.8.5",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.4.5"

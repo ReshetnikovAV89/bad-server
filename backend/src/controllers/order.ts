@@ -7,7 +7,6 @@ import Order, { IOrder, StatusType } from '../models/order'
 import Product, { IProduct } from '../models/product'
 import User from '../models/user'
 
-
 const MAX_LIMIT = 50
 const MAX_SEARCH_LENGTH = 80
 const ALLOWED_SORT_FIELDS = new Set([
@@ -75,7 +74,10 @@ function getSortOrder(value: unknown) {
 
 function getStatusFilter(value: unknown) {
     const rawValue = getQueryString(value)
-    if (!rawValue || !Object.values(StatusType).includes(rawValue as StatusType)) {
+    if (
+        !rawValue ||
+        !Object.values(StatusType).includes(rawValue as StatusType)
+    ) {
         return undefined
     }
 
@@ -104,7 +106,11 @@ export const getOrders = async (
             search,
         } = req.query
 
-        const currentPage = parsePositiveInteger(page, 1, Number.MAX_SAFE_INTEGER)
+        const currentPage = parsePositiveInteger(
+            page,
+            1,
+            Number.MAX_SAFE_INTEGER
+        )
         const pageSize = parsePositiveInteger(limit, 10, MAX_LIMIT)
 
         const filters: FilterQuery<Partial<IOrder>> = {}
@@ -219,7 +225,11 @@ export const getOrdersCurrentUser = async (
     try {
         const userId = res.locals.user._id
         const { search, page, limit } = req.query
-        const currentPage = parsePositiveInteger(page, 1, Number.MAX_SAFE_INTEGER)
+        const currentPage = parsePositiveInteger(
+            page,
+            1,
+            Number.MAX_SAFE_INTEGER
+        )
         const pageSize = parsePositiveInteger(limit, 5, MAX_LIMIT)
 
         const user = await User.findById(userId)

@@ -1,6 +1,5 @@
-import { unlink } from 'fs'
-import mongoose, { Document } from 'mongoose'
-import { join } from 'path'
+import mongoose, { Document, Query } from 'mongoose'
+import { getPublicPath, removeSafeFile } from '../utils/files'
 
 export interface IFile {
     fileName: string
@@ -13,6 +12,10 @@ export interface IProduct extends Document {
     category: string
     description: string
     price: number
+}
+
+type ProductUpdate = {
+    $set?: Partial<IProduct>
 }
 
 const cardsSchema = new mongoose.Schema<IProduct>(
@@ -48,24 +51,29 @@ const cardsSchema = new mongoose.Schema<IProduct>(
 
 cardsSchema.index({ title: 'text' })
 
-// Можно лучше: удалять старое изображением перед обновлением сущности
-cardsSchema.pre('findOneAndUpdate', async function deleteOldImage() {
-    // @ts-ignore
-    const updateImage = this.getUpdate().$set?.image
-    const docToUpdate = await this.model.findOne(this.getQuery())
-    if (updateImage && docToUpdate) {
-        unlink(
-            join(__dirname, `../public/${docToUpdate.image.fileName}`),
-            (err) => console.log(err)
+cardsSchema.pre(
+    'findOneAndUpdate',
+    async function deleteOldImage(this: Query<IProduct | null, IProduct>) {
+        const update = this.getUpdate() as ProductUpdate
+        const updateImage = update.$set?.image
+        const docToUpdate = await this.model.findOne(this.getQuery())
+
+        if (updateImage && docToUpdate?.image?.fileName) {
+            await removeSafeFile(
+                getPublicPath(process.env.UPLOAD_PATH || ''),
+                docToUpdate.image.fileName
+            )
+        }
+    }
+)
+
+cardsSchema.post('findOneAndDelete', async (doc: IProduct | null) => {
+    if (doc?.image?.fileName) {
+        await removeSafeFile(
+            getPublicPath(process.env.UPLOAD_PATH || ''),
+            doc.image.fileName
         )
     }
-})
-
-// Можно лучше: удалять файл с изображением после удаление сущности
-cardsSchema.post('findOneAndDelete', async (doc: IProduct) => {
-    unlink(join(__dirname, `../public/${doc.image.fileName}`), (err) =>
-        console.log(err)
-    )
 })
 
 export default mongoose.model<IProduct>('product', cardsSchema)

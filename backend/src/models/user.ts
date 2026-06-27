@@ -1,11 +1,13 @@
 /* eslint-disable no-param-reassign */
-import crypto from 'crypto'
-import jwt from 'jsonwebtoken'
 import mongoose, { Document, HydratedDocument, Model, Types } from 'mongoose'
 import validator from 'validator'
 import bcrypt from 'bcryptjs'
 
-import { ACCESS_TOKEN, REFRESH_TOKEN } from '../config'
+import {
+    createAccessToken,
+    createRefreshToken,
+    hashRefreshToken,
+} from '../utils/tokens'
 import UnauthorizedError from '../errors/unauthorized-error'
 
 export enum Role {
@@ -106,7 +108,13 @@ const userSchema = new mongoose.Schema<IUser, IUserModel, IUserMethods>(
         toJSON: {
             virtuals: true,
             transform: (_doc, ret) => {
-                const { tokens: _tokens, password: _password, _id, roles: _roles, ...rest } = ret
+                const {
+                    tokens: _tokens,
+                    password: _password,
+                    _id,
+                    roles: _roles,
+                    ...rest
+                } = ret
                 return rest
             },
         },
@@ -125,48 +133,17 @@ userSchema.pre('save', async function hashingPassword(next) {
     }
 })
 
-// Можно лучше: централизованное создание accessToken и  refresh токена
-
 userSchema.methods.generateAccessToken = function generateAccessToken() {
-    const user = this
-    // Создание accessToken токена возможно в контроллере авторизации
-    return jwt.sign(
-        {
-            _id: user._id.toString(),
-            email: user.email,
-        },
-        ACCESS_TOKEN.secret,
-        {
-            expiresIn: ACCESS_TOKEN.expiry,
-            subject: user.id.toString(),
-        }
-    )
+    return createAccessToken(this)
 }
 
 userSchema.methods.generateRefreshToken =
     async function generateRefreshToken() {
-        const user = this
-        // Создание refresh токена возможно в контроллере авторизации/регистрации
-        const refreshToken = jwt.sign(
-            {
-                _id: user._id.toString(),
-            },
-            REFRESH_TOKEN.secret,
-            {
-                expiresIn: REFRESH_TOKEN.expiry,
-                subject: user.id.toString(),
-            }
-        )
+        const refreshToken = createRefreshToken(this)
+        const refreshTokenHash = hashRefreshToken(refreshToken)
 
-        // Можно лучше: Создаем хеш refresh токена
-        const rTknHash = crypto
-            .createHmac('sha256', REFRESH_TOKEN.secret)
-            .update(refreshToken)
-            .digest('hex')
-
-        // Сохраняем refresh токена в базу данных, можно делать в контроллере авторизации/регистрации
-        user.tokens.push({ token: rTknHash })
-        await user.save()
+        this.tokens.push({ token: refreshTokenHash })
+        await this.save()
 
         return refreshToken
     }

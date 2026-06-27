@@ -5,7 +5,6 @@ import escapeRegExp from '../utils/escapeRegExp'
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
 
-
 const MAX_LIMIT = 50
 const MAX_SEARCH_LENGTH = 80
 const ALLOWED_SORT_FIELDS = new Set([
@@ -72,7 +71,6 @@ function getSortOrder(value: unknown) {
     return getQueryString(value) === 'asc' ? 1 : -1
 }
 
-// TODO: Добавить guard admin
 // eslint-disable-next-line max-len
 // Get GET /customers?page=2&limit=5&sort=totalAmount&order=desc&registrationDateFrom=2023-01-01&registrationDateTo=2023-12-31&lastOrderDateFrom=2023-01-01&lastOrderDateTo=2023-12-31&totalAmountFrom=100&totalAmountTo=1000&orderCountFrom=1&orderCountTo=10
 export const getCustomers = async (
@@ -97,7 +95,11 @@ export const getCustomers = async (
             search,
         } = req.query
 
-        const currentPage = parsePositiveInteger(page, 1, Number.MAX_SAFE_INTEGER)
+        const currentPage = parsePositiveInteger(
+            page,
+            1,
+            Number.MAX_SAFE_INTEGER
+        )
         const pageSize = parsePositiveInteger(limit, 10, MAX_LIMIT)
 
         const filters: FilterQuery<Partial<IUser>> = {}
@@ -228,7 +230,6 @@ export const getCustomers = async (
     }
 }
 
-// TODO: Добавить guard admin
 // Get /customers/:id
 export const getCustomerById = async (
     req: Request,
@@ -246,19 +247,38 @@ export const getCustomerById = async (
     }
 }
 
-// TODO: Добавить guard admin
 // Patch /customers/:id
 export const updateCustomer = async (
     req: Request,
     res: Response,
     next: NextFunction
 ) => {
+    const { name, email, phone } = req.body
+    const updateData: Partial<{
+        name: string
+        email: string
+        phone: string
+    }> = {}
+
+    if (name !== undefined) {
+        updateData.name = name
+    }
+
+    if (email !== undefined) {
+        updateData.email = email
+    }
+
+    if (phone !== undefined) {
+        updateData.phone = phone
+    }
+
     try {
         const updatedUser = await User.findByIdAndUpdate(
             req.params.id,
-            req.body,
+            updateData,
             {
                 new: true,
+                runValidators: true,
             }
         )
             .orFail(
@@ -274,7 +294,6 @@ export const updateCustomer = async (
     }
 }
 
-// TODO: Добавить guard admin
 // Delete /customers/:id
 export const deleteCustomer = async (
     req: Request,

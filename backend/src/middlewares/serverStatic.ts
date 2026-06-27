@@ -8,8 +8,8 @@ export default function serveStatic(baseDir: string) {
         const filePath = path.join(baseDir, req.path)
 
         // Проверяем, существует ли файл
-        fs.access(filePath, fs.constants.F_OK, (err) => {
-            if (err) {
+        fs.access(filePath, fs.constants.F_OK, (accessError) => {
+            if (accessError) {
                 // Файл не существует отдаем дальше мидлварам
                 return next()
             }
