@@ -16,8 +16,12 @@ const app = express()
 
 app.set('trust proxy', 1)
 
+const allowedOrigins = ORIGIN_ALLOW.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+
 const corsOptions = {
-    origin: ORIGIN_ALLOW.split(',').map((origin) => origin.trim()),
+    origin: allowedOrigins[0] || 'http://localhost:5173',
     credentials: true,
 }
 
