@@ -101,35 +101,67 @@ export const validateObjId = celebrate({
 })
 
 export const validateUserBody = celebrate({
-    body: Joi.object().keys({
-        name: Joi.string().min(2).max(30).messages({
-            'string.min': 'Минимальная длина поля "name" - 2',
-            'string.max': 'Максимальная длина поля "name" - 30',
-        }),
-        password: Joi.string().min(6).required().messages({
-            'string.empty': 'Поле "password" должно быть заполнено',
-        }),
-        email: Joi.string()
-            .required()
-            .email()
-            .message('Поле "email" должно быть валидным email-адресом')
-            .messages({
-                'string.empty': 'Поле "email" должно быть заполнено',
+    body: Joi.object()
+        .keys({
+            name: Joi.string().min(2).max(30).messages({
+                'string.min': 'Минимальная длина поля "name" - 2',
+                'string.max': 'Максимальная длина поля "name" - 30',
             }),
-    }),
+            password: Joi.string().min(6).max(128).required().messages({
+                'string.empty': 'Поле "password" должно быть заполнено',
+                'string.max': 'Максимальная длина поля "password" - 128',
+            }),
+            email: Joi.string()
+                .required()
+                .max(254)
+                .email()
+                .message('Поле "email" должно быть валидным email-адресом')
+                .messages({
+                    'string.empty': 'Поле "email" должно быть заполнено',
+                    'string.max': 'Максимальная длина поля "email" - 254',
+                }),
+        })
+        .unknown(false),
+})
+
+export const validateUpdateUserBody = celebrate({
+    body: Joi.object()
+        .keys({
+            name: Joi.string().min(2).max(30).messages({
+                'string.min': 'Минимальная длина поля "name" - 2',
+                'string.max': 'Максимальная длина поля "name" - 30',
+            }),
+            email: Joi.string()
+                .max(254)
+                .email()
+                .message('Поле "email" должно быть валидным email-адресом')
+                .messages({
+                    'string.max': 'Максимальная длина поля "email" - 254',
+                }),
+            phone: Joi.string().max(30).pattern(phoneRegExp).messages({
+                'string.max': 'Максимальная длина поля "phone" - 30',
+            }),
+        })
+        .min(1)
+        .unknown(false),
 })
 
 export const validateAuthentication = celebrate({
-    body: Joi.object().keys({
-        email: Joi.string()
-            .required()
-            .email()
-            .message('Поле "email" должно быть валидным email-адресом')
-            .messages({
-                'string.required': 'Поле "email" должно быть заполнено',
+    body: Joi.object()
+        .keys({
+            email: Joi.string()
+                .required()
+                .max(254)
+                .email()
+                .message('Поле "email" должно быть валидным email-адресом')
+                .messages({
+                    'string.required': 'Поле "email" должно быть заполнено',
+                    'string.max': 'Максимальная длина поля "email" - 254',
+                }),
+            password: Joi.string().required().max(128).messages({
+                'string.empty': 'Поле "password" должно быть заполнено',
+                'string.max': 'Максимальная длина поля "password" - 128',
             }),
-        password: Joi.string().required().messages({
-            'string.empty': 'Поле "password" должно быть заполнено',
-        }),
-    }),
+        })
+        .unknown(false),
 })
