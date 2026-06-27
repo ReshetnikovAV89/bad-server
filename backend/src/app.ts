@@ -14,6 +14,8 @@ import routes from './routes'
 
 const app = express()
 
+app.set('trust proxy', 1)
+
 const corsOptions = {
     origin: ORIGIN_ALLOW.split(',').map((origin) => origin.trim()),
     credentials: true,
