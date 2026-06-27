@@ -8,7 +8,7 @@ import Product from '../models/product'
 import movingFile from '../utils/movingFile'
 import { getPublicPath } from '../utils/files'
 
-const MAX_LIMIT = 50
+const MAX_LIMIT = 10
 
 function getQueryString(value: unknown) {
     return typeof value === 'string' ? value : undefined

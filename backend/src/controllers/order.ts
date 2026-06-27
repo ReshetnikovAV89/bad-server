@@ -7,7 +7,7 @@ import Order, { IOrder, StatusType } from '../models/order'
 import Product, { IProduct } from '../models/product'
 import User from '../models/user'
 
-const MAX_LIMIT = 50
+const MAX_LIMIT = 10
 const MAX_SEARCH_LENGTH = 80
 const ALLOWED_SORT_FIELDS = new Set([
     'createdAt',
@@ -18,6 +18,17 @@ const ALLOWED_SORT_FIELDS = new Set([
 
 function getQueryString(value: unknown) {
     return typeof value === 'string' ? value : undefined
+}
+
+function sanitizeComment(value: unknown) {
+    if (typeof value !== 'string') {
+        return ''
+    }
+
+    return value
+        .replace(/<[^>]*>/g, '')
+        .replace(/javascript:/gi, '')
+        .replace(/on\w+=/gi, '')
 }
 
 function parsePositiveInteger(
@@ -383,7 +394,7 @@ export const createOrder = async (
             payment,
             phone,
             email,
-            comment,
+            comment: sanitizeComment(comment),
             customer: userId,
             deliveryAddress: address,
         })

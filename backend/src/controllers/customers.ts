@@ -5,7 +5,7 @@ import escapeRegExp from '../utils/escapeRegExp'
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
 
-const MAX_LIMIT = 50
+const MAX_LIMIT = 10
 const MAX_SEARCH_LENGTH = 80
 const ALLOWED_SORT_FIELDS = new Set([
     'createdAt',
