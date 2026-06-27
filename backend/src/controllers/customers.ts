@@ -16,7 +16,15 @@ const ALLOWED_SORT_FIELDS = new Set([
 ])
 
 function getQueryString(value: unknown) {
-    return typeof value === 'string' ? value : undefined
+    if (value === undefined) {
+        return undefined
+    }
+
+    if (typeof value !== 'string') {
+        throw new BadRequestError('Некорректный формат query-параметра')
+    }
+
+    return value
 }
 
 function parsePositiveInteger(
