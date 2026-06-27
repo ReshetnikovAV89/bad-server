@@ -5,6 +5,7 @@ import { ORIGIN_ALLOW } from '../config'
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
 const CSRF_COOKIE_NAME = 'csrfToken'
+const CSRF_COMPAT_COOKIE_NAME = '_csrf'
 
 const allowedOrigins = ORIGIN_ALLOW.split(',')
     .map((origin) => origin.trim())
@@ -50,6 +51,12 @@ function isSameToken(firstToken: string, secondToken: string) {
 
 export function csrfTokenHandler(_req: Request, res: Response) {
     const csrfToken = randomBytes(32).toString('hex')
+
+    res.cookie(CSRF_COMPAT_COOKIE_NAME, csrfToken, {
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        path: '/',
+    })
 
     res.cookie(CSRF_COOKIE_NAME, csrfToken, {
         sameSite: 'lax',
