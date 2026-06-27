@@ -82,7 +82,9 @@ export default function csrfGuard(
         return next(new ForbiddenError('Недопустимый источник запроса'))
     }
 
-    const cookieToken = req.cookies?.[CSRF_COOKIE_NAME]
+    const cookieToken =
+        req.cookies?.[CSRF_COOKIE_NAME] ||
+        req.cookies?.[CSRF_COMPAT_COOKIE_NAME]
     const headerToken = getHeaderToken(req)
 
     if (
