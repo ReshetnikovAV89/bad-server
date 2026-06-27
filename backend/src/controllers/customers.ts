@@ -1,8 +1,76 @@
 import { NextFunction, Request, Response } from 'express'
 import { FilterQuery } from 'mongoose'
 import NotFoundError from '../errors/not-found-error'
+import escapeRegExp from '../utils/escapeRegExp'
 import Order from '../models/order'
 import User, { IUser } from '../models/user'
+
+
+const MAX_LIMIT = 50
+const MAX_SEARCH_LENGTH = 80
+const ALLOWED_SORT_FIELDS = new Set([
+    'createdAt',
+    'lastOrderDate',
+    'totalAmount',
+    'orderCount',
+    'name',
+])
+
+function getQueryString(value: unknown) {
+    return typeof value === 'string' ? value : undefined
+}
+
+function parsePositiveInteger(
+    value: unknown,
+    defaultValue: number,
+    maxValue: number
+) {
+    const parsed = Number(getQueryString(value) ?? defaultValue)
+    if (!Number.isInteger(parsed) || parsed < 1) {
+        return defaultValue
+    }
+    return Math.min(parsed, maxValue)
+}
+
+function parseNumberQuery(value: unknown) {
+    const rawValue = getQueryString(value)
+    if (!rawValue) {
+        return undefined
+    }
+
+    const parsed = Number(rawValue)
+    return Number.isFinite(parsed) ? parsed : undefined
+}
+
+function parseDateQuery(value: unknown) {
+    const rawValue = getQueryString(value)
+    if (!rawValue) {
+        return undefined
+    }
+
+    const parsed = new Date(rawValue)
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed
+}
+
+function createSafeSearchRegex(value: unknown) {
+    const rawValue = getQueryString(value)?.trim()
+    if (!rawValue || rawValue.length > MAX_SEARCH_LENGTH) {
+        return undefined
+    }
+
+    return new RegExp(escapeRegExp(rawValue), 'i')
+}
+
+function getSortField(value: unknown) {
+    const rawValue = getQueryString(value)
+    return rawValue && ALLOWED_SORT_FIELDS.has(rawValue)
+        ? rawValue
+        : 'createdAt'
+}
+
+function getSortOrder(value: unknown) {
+    return getQueryString(value) === 'asc' ? 1 : -1
+}
 
 // TODO: Добавить guard admin
 // eslint-disable-next-line max-len
@@ -14,10 +82,10 @@ export const getCustomers = async (
 ) => {
     try {
         const {
-            page = 1,
-            limit = 10,
-            sortField = 'createdAt',
-            sortOrder = 'desc',
+            page,
+            limit,
+            sortField,
+            sortOrder,
             registrationDateFrom,
             registrationDateTo,
             lastOrderDateFrom,
@@ -29,70 +97,79 @@ export const getCustomers = async (
             search,
         } = req.query
 
+        const currentPage = parsePositiveInteger(page, 1, Number.MAX_SAFE_INTEGER)
+        const pageSize = parsePositiveInteger(limit, 10, MAX_LIMIT)
+
         const filters: FilterQuery<Partial<IUser>> = {}
 
-        if (registrationDateFrom) {
+        const registrationFromDate = parseDateQuery(registrationDateFrom)
+        if (registrationFromDate) {
             filters.createdAt = {
                 ...filters.createdAt,
-                $gte: new Date(registrationDateFrom as string),
+                $gte: registrationFromDate,
             }
         }
 
-        if (registrationDateTo) {
-            const endOfDay = new Date(registrationDateTo as string)
-            endOfDay.setHours(23, 59, 59, 999)
+        const registrationToDate = parseDateQuery(registrationDateTo)
+        if (registrationToDate) {
+            registrationToDate.setHours(23, 59, 59, 999)
             filters.createdAt = {
                 ...filters.createdAt,
-                $lte: endOfDay,
+                $lte: registrationToDate,
             }
         }
 
-        if (lastOrderDateFrom) {
+        const lastOrderFromDate = parseDateQuery(lastOrderDateFrom)
+        if (lastOrderFromDate) {
             filters.lastOrderDate = {
                 ...filters.lastOrderDate,
-                $gte: new Date(lastOrderDateFrom as string),
+                $gte: lastOrderFromDate,
             }
         }
 
-        if (lastOrderDateTo) {
-            const endOfDay = new Date(lastOrderDateTo as string)
-            endOfDay.setHours(23, 59, 59, 999)
+        const lastOrderToDate = parseDateQuery(lastOrderDateTo)
+        if (lastOrderToDate) {
+            lastOrderToDate.setHours(23, 59, 59, 999)
             filters.lastOrderDate = {
                 ...filters.lastOrderDate,
-                $lte: endOfDay,
+                $lte: lastOrderToDate,
             }
         }
 
-        if (totalAmountFrom) {
+        const minTotalAmount = parseNumberQuery(totalAmountFrom)
+        if (minTotalAmount !== undefined) {
             filters.totalAmount = {
                 ...filters.totalAmount,
-                $gte: Number(totalAmountFrom),
+                $gte: minTotalAmount,
             }
         }
 
-        if (totalAmountTo) {
+        const maxTotalAmount = parseNumberQuery(totalAmountTo)
+        if (maxTotalAmount !== undefined) {
             filters.totalAmount = {
                 ...filters.totalAmount,
-                $lte: Number(totalAmountTo),
+                $lte: maxTotalAmount,
             }
         }
 
-        if (orderCountFrom) {
+        const minOrderCount = parseNumberQuery(orderCountFrom)
+        if (minOrderCount !== undefined) {
             filters.orderCount = {
                 ...filters.orderCount,
-                $gte: Number(orderCountFrom),
+                $gte: minOrderCount,
             }
         }
 
-        if (orderCountTo) {
+        const maxOrderCount = parseNumberQuery(orderCountTo)
+        if (maxOrderCount !== undefined) {
             filters.orderCount = {
                 ...filters.orderCount,
-                $lte: Number(orderCountTo),
+                $lte: maxOrderCount,
             }
         }
 
-        if (search) {
-            const searchRegex = new RegExp(search as string, 'i')
+        const searchRegex = createSafeSearchRegex(search)
+        if (searchRegex) {
             const orders = await Order.find(
                 {
                     $or: [{ deliveryAddress: searchRegex }],
@@ -108,16 +185,14 @@ export const getCustomers = async (
             ]
         }
 
-        const sort: { [key: string]: any } = {}
-
-        if (sortField && sortOrder) {
-            sort[sortField as string] = sortOrder === 'desc' ? -1 : 1
+        const sort = {
+            [getSortField(sortField)]: getSortOrder(sortOrder),
         }
 
         const options = {
             sort,
-            skip: (Number(page) - 1) * Number(limit),
-            limit: Number(limit),
+            skip: (currentPage - 1) * pageSize,
+            limit: pageSize,
         }
 
         const users = await User.find(filters, null, options).populate([
@@ -137,15 +212,15 @@ export const getCustomers = async (
         ])
 
         const totalUsers = await User.countDocuments(filters)
-        const totalPages = Math.ceil(totalUsers / Number(limit))
+        const totalPages = Math.ceil(totalUsers / pageSize)
 
         res.status(200).json({
             customers: users,
             pagination: {
                 totalUsers,
                 totalPages,
-                currentPage: Number(page),
-                pageSize: Number(limit),
+                currentPage,
+                pageSize,
             },
         })
     } catch (error) {
