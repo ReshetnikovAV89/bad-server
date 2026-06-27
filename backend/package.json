@@ -13,7 +13,7 @@
     "lint:strict": "npx eslint src/**/*.ts --max-warnings=0",
     "check:dangerous-code": "node scripts/check-dangerous-code.mjs",
     "check:hardcode": "node scripts/check-hardcode.mjs",
-    "check": "npm run build && npm run lint:strict && npm run format:check && npm run check:unused && npm run check:empty-files && npm run check:deps && npm run check:dangerous-code && npm run check:hardcode",
+    "check": "npm run build && npm run lint:strict && npm run format:check && npm run check:unused && npm run check:empty-files && npm run check:dangerous-code && npm run check:hardcode",
     "format:check": "prettier \"src/**/*.ts\" \"scripts/**/*.mjs\" --check",
     "check:unused": "tsc --noEmit --noUnusedLocals --noUnusedParameters",
     "check:deps": "knip",

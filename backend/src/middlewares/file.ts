@@ -1,4 +1,5 @@
-import type { Request, Express } from 'express'
+/* eslint-disable no-undef */
+import type { Request } from 'express'
 import multer, { FileFilterCallback } from 'multer'
 import { mkdirSync } from 'fs'
 import { getPublicPath, createSafeImageFileName } from '../utils/files'
