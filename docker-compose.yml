@@ -29,8 +29,8 @@ services:
     volumes:
       - ./backend/src:/app/src
       - public:/app/src/public
-    ports:
-      - 3000:3000
+    expose:
+      - 3000
     networks:
       - internal
     depends_on:

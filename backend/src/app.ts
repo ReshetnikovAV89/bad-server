@@ -3,10 +3,12 @@ import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import 'dotenv/config'
 import express, { json, urlencoded } from 'express'
+import rateLimit from 'express-rate-limit'
 import mongoose from 'mongoose'
 import path from 'path'
 import { DB_ADDRESS, ORIGIN_ALLOW, PORT } from './config'
 import errorHandler from './middlewares/error-handler'
+import csrfGuard from './middlewares/csrf-guard'
 import serveStatic from './middlewares/serverStatic'
 import routes from './routes'
 
@@ -17,8 +19,17 @@ const corsOptions = {
     credentials: true,
 }
 
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 100,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+})
+
+app.use(limiter)
 app.use(cookieParser())
 app.use(cors(corsOptions))
+app.use(csrfGuard)
 
 app.use(serveStatic(path.join(__dirname, 'public')))
 
@@ -35,6 +46,7 @@ const bootstrap = async () => {
     await app.listen(PORT)
 }
 
-bootstrap().catch(() => {
+bootstrap().catch((error: Error) => {
+    process.stderr.write(`${error.message}\n`)
     process.exit(1)
 })
