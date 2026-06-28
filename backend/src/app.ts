@@ -3,41 +3,56 @@ import cookieParser from 'cookie-parser'
 import cors from 'cors'
 import 'dotenv/config'
 import express, { json, urlencoded } from 'express'
+import rateLimit from 'express-rate-limit'
 import mongoose from 'mongoose'
 import path from 'path'
-import { DB_ADDRESS } from './config'
+import { DB_ADDRESS, ORIGIN_ALLOW, PORT } from './config'
 import errorHandler from './middlewares/error-handler'
+import csrfGuard from './middlewares/csrf-guard'
 import serveStatic from './middlewares/serverStatic'
 import routes from './routes'
 
-const { PORT = 3000 } = process.env
 const app = express()
 
-app.use(cookieParser())
+app.set('trust proxy', 1)
 
-app.use(cors())
-// app.use(cors({ origin: ORIGIN_ALLOW, credentials: true }));
-// app.use(express.static(path.join(__dirname, 'public')));
+const allowedOrigins = ORIGIN_ALLOW.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+
+const corsOptions = {
+    origin: allowedOrigins[0] || 'http://localhost:5173',
+    credentials: true,
+}
+
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 50,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+})
+
+app.use(limiter)
+app.use(cookieParser())
+app.use(cors(corsOptions))
+app.use(csrfGuard)
 
 app.use(serveStatic(path.join(__dirname, 'public')))
 
-app.use(urlencoded({ extended: true }))
-app.use(json())
+app.use(urlencoded({ extended: true, limit: '100kb' }))
+app.use(json({ limit: '100kb' }))
 
-app.options('*', cors())
+app.options('*', cors(corsOptions))
 app.use(routes)
 app.use(errors())
 app.use(errorHandler)
 
-// eslint-disable-next-line no-console
-
 const bootstrap = async () => {
-    try {
-        await mongoose.connect(DB_ADDRESS)
-        await app.listen(PORT, () => console.log('ok'))
-    } catch (error) {
-        console.error(error)
-    }
+    await mongoose.connect(DB_ADDRESS)
+    await app.listen(PORT)
 }
 
-bootstrap()
+bootstrap().catch((error: Error) => {
+    process.stderr.write(`${error.message}\n`)
+    process.exit(1)
+})

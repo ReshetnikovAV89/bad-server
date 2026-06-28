@@ -4,7 +4,7 @@ import { RootState } from '@store/store'
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
-interface PaginationResult<_, U> {
+interface PaginationResult<U> {
     data: U[]
     totalPages: number
     currentPage: number
@@ -16,10 +16,11 @@ interface PaginationResult<_, U> {
 }
 
 const usePagination = <T, U>(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     asyncAction: AsyncThunk<T, Record<string, unknown>, any>,
     selector: (state: RootState) => U[],
     defaultLimit: number
-): PaginationResult<T, U> => {
+): PaginationResult<U> => {
     const dispatch = useDispatch()
     const data = useSelector(selector)
     const [searchParams, setSearchParams] = useSearchParams()
@@ -32,7 +33,9 @@ const usePagination = <T, U>(
 
     const limit = Number(searchParams.get('limit')) || defaultLimit
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const fetchData = async (params: Record<string, any>) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const response: any = await dispatch(asyncAction(params))
         setTotalPages(response.payload.pagination.totalPages)
     }
@@ -46,8 +49,8 @@ const usePagination = <T, U>(
         })
     }, [currentPage, limit, searchParams])
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateURL = (newParams: Record<string, any>) => {
-        3
         const updatedParams = new URLSearchParams(searchParams)
         Object.entries(newParams).forEach(([key, value]) => {
             if (value !== undefined) {
